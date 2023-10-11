@@ -15,9 +15,12 @@
 
 
 import argparse
+from vspec.model.constants import VSSTreeType
 from vspec.model.vsstree import VSSNode
 import yaml
 import logging
+import os
+from vspec import load_tree
 from vspec.loggingconfig import initLogging
 from typing import Dict, Any
 
@@ -107,12 +110,39 @@ class NoAliasDumper(yaml.SafeDumper):
             super().write_line_break()
 
 
+
+def validate_split_id(tree: VSSNode, other_tree: VSSNode):
+    """
+    Validates if all assigned match with either a previously genereated vspec or the current main vspec.
+    If not it will either 1. automatically assign new available staticUIDs (depending on layer) or 2. ask you what you want to do next.
+    """
+    # iterate over all nodes once to check if there were new ones
+    # ToDo: load other_tree = load_tree(other_tree_path, include_paths=['.'])
+    return_value = tree.validate_children_names(other_tree)
+    print(f"check valdation names = {return_value}")
+
+    # ToDo: check if types were changed
+    # ToDo: check if unit was changed
+    tree.validate_staticUIDs(other_tree)
+    
+
+
 def export(config: argparse.Namespace, signal_root: VSSNode, print_uuid, data_type_root: VSSNode):
     logging.info("Generating YAML output...")
 
     signals_yaml_dict: Dict[str, Any] = {}
     export_node(signals_yaml_dict, signal_root, config, print_uuid)
 
+    if config.validate_with_file:
+        logging.info(f"Now validating nodes, static UIDs, types, units and description with file '{config.validate_with_file}'")
+        if os.path.isabs(config.validate_with_file):
+            other_path = config.validate_with_file
+        else: 
+            other_path = os.path.join(os.getcwd(), config.validate_with_file)
+        # ToDo: how do we know here if SIGNAL or DATA_TYPE tree
+        other_tree = load_tree(other_path, ["."], tree_type=VSSTreeType.SIGNAL_TREE)
+        validate_split_id(signal_root, other_tree)
+    
     if data_type_root is not None:
         data_types_yaml_dict: Dict[str, Any] = {}
         export_node(data_types_yaml_dict, data_type_root, config, print_uuid)

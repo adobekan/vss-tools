@@ -794,6 +794,10 @@ def render_tree(
             break_on_name_style_violation=break_on_name_style_violation)
 
     create_tree_uuids(tree_root)
+
+    if "staticUID" in root_element.keys():
+        assign_static_uids(tree_root, root_element)
+
     return tree_root
 
 
@@ -852,6 +856,21 @@ def merge_tree(base: VSSNode, overlay: VSSNode):
     overlay_element: VSSNode
     for overlay_element in LevelOrderIter(overlay):
         merge_elem(base, overlay_element)
+
+def get_all_static_uids(uid_dict):
+    for key, value in uid_dict.items():
+        yield key, value
+        if isinstance(value, dict):
+            yield from get_all_static_uids(value)
+
+def assign_static_uids(root: VSSNode, uid_dict: dict):
+    uids: list = []
+    for key, value in get_all_static_uids(uid_dict):
+        if key == "staticUID":
+            uids.append(value)
+    # ToDo: this only works if amount of nodes has not changed
+    for node, uid in zip(PreOrderIter(root), uids):
+        node.staticUID = uid
 
 
 def create_tree_uuids(root: VSSNode):

@@ -7,7 +7,7 @@
 # provisions of the license provided by the LICENSE file in this repository.
 #
 
-from anytree import Node, Resolver, ChildResolverError, RenderTree  # type: ignore[import]
+from anytree import Node, Resolver, ChildResolverError, RenderTree, PreOrderIter  # type: ignore[import]
 from .constants import VSSType, VSSDataType, Unit, VSSConstant
 from .exceptions import NameStyleValidationException, \
     ImpossibleMergeException, IncompleteElementException
@@ -28,6 +28,7 @@ class VSSNode(Node):
     description = None
     comment: str = ""
     uuid: str = ""
+    staticUID: str = ""
     # data type - string representation. For struct names, this is the fully
     # qualified struct name.
     data_type_str: str = ""
@@ -147,6 +148,9 @@ class VSSNode(Node):
                 sys.exit(-1)
         else:
             self.unit = None
+
+        if "staticUID" in self.source_dict.keys():
+            self.staticUID = self.source_dict["staticUID"]
 
         if self.has_instances() and not self.is_branch():
             logging.error(
@@ -468,3 +472,104 @@ class VSSNode(Node):
         Projection of nodes that meet the filter criterion specified.
         """
         return [proj_fn(n) for _, _, n in RenderTree(node) if filter_fn(n)]
+
+    def validate_children_names(self, other_tree: "VSSNode") -> Optional[dict]:
+        """THIS METHOD IS A WIP
+        Check if new nodes were added or names have changed
+
+        ToDos:
+            - 
+            
+        Args:
+            other_tree (VSSNode): Other tree that we want to compare with the current tree
+
+        Returns:
+            Optional[dict]: _description_
+        """
+        # go to top in case we are not
+        if self.parent:
+            while self.parent:
+                self = self.parent
+        if other_tree.parent:
+            while other_tree.parent:
+                other_tree = other_tree.parent
+
+        tree_nodes = [node.qualified_name() for node in PreOrderIter(self)]
+        other_tree_nodes = [node.qualified_name() for node in PreOrderIter(other_tree)]
+
+        if sorted(tree_nodes) == sorted(other_tree_nodes):
+            return None
+        else:
+            not_in_other_tree = []
+            not_in_current_tree = []
+            for node in PreOrderIter(self):
+                current_path = node.qualified_name()
+                if current_path not in other_tree_nodes:
+                    not_in_other_tree.append(current_path)
+            for node in PreOrderIter(other_tree):
+                current_path = node.qualified_name()
+                if current_path not in tree_nodes:
+                    not_in_current_tree.append(current_path)
+
+            return {"not in other tree": not_in_other_tree, "not in current tree": not_in_current_tree}
+
+    def validate_staticUIDs(self, other_tree: "VSSNode", decimal_output=False) -> Optional[dict]:
+        """Check if static UIDs have changed or if new ones need to be added
+
+        ToDos: 
+            - instances
+            - automatic mode --> do we overwrite with a next higher ID because data in node has changed?
+            
+
+        Args:
+            other_tree (VSSNode): _description_
+
+        Returns:
+            Optional[dict]: _description_
+        """
+        # go to top in case we are not
+        if self.parent:
+            while self.parent:
+                self = self.parent
+        if other_tree.parent:
+            while other_tree.parent:
+                other_tree = other_tree.parent
+
+        tree_nodes = [node for node in PreOrderIter(self)]
+        other_tree_nodes = [node for node in PreOrderIter(other_tree)]
+        
+        # 1. check if all nodes have staticUID of correct length
+        for node in tree_nodes:
+            if not node.staticUID:
+                logging.error(f"Static UID for node '{node.qualified_name()}' has not been assigned!")
+            else:
+                if decimal_output:
+                    try:
+                        assert len(node.staticUID) == 8
+                    except AssertionError:
+                        logging.error(f"AssertionError: Length of decimal static UID of {node.qualified_name()} is incorrect, check vssidgen.py")
+                else: 
+                    try:
+                        assert len(node.staticUID) == 10
+                    except AssertionError:
+                        logging.error(f"AssertionError: Length of hex static UID of {node.qualified_name()} is incorrect, check vssidgen.py")
+                    
+                
+        for node in tree_nodes:
+            # check where node is in other tree
+            match_tuple = [(node.qualified_name(), id_other_tree) for id_other_tree, other_node in enumerate(other_tree_nodes) if node.qualified_name() == other_node.qualified_name()]
+            # ToDo: can we pop elements that have been read to speed up the loops currently O(n^2)
+            # other_tree_nodes.pop(match_tuple[0][1])
+            try:
+                assert node.staticUID == other_tree_nodes[match_tuple[0][1]].staticUID
+            except AssertionError:
+                # ToDo: automatic mode
+                logging.info(f"IDs don't match what would you like to do? Current tree's node '{node.qualified_name()}' has static UID '{node.staticUID}' and other tree's node '{other_tree_nodes[match_tuple[0][1]].qualified_name()}' has static UID '{other_tree_nodes[match_tuple[0][1]].staticUID}'\n1) Assign new ID\n2) Overwrite ID with new ID")
+                overwrite_method = input()
+                if overwrite_method != 1 or 2:
+                    logging.info("Wrong input please choose again\n1) Assign new ID\n2) Overwrite ID with new ID")
+                    overwrite_method = input()
+                # ToDo: methods for ID assigning and overwriting
+
+            
+            # ToDo check unit, description and other fields
