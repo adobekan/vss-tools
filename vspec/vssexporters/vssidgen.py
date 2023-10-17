@@ -188,6 +188,9 @@ def validate_staticUIDs(signals_dict: dict, validation_tree: VSSNode, config: ar
     def check_type(k, v):
         pass
 
+    def check_uid(k, v, match_tuple):
+        pass
+
     def assign_new_id(
         k: str, v: dict, assign_id: int, config: argparse.Namespace
     ) -> None:
@@ -225,6 +228,15 @@ def validate_staticUIDs(signals_dict: dict, validation_tree: VSSNode, config: ar
         v["staticUID"] = current_id
         logging.info(f"Assigned new ID '{current_id}' for {k}")
 
+    def get_id_from_string(hex_string: str, config) -> int:
+        curr_value: int
+        if not config.gen_no_layer and not config.gen_decimal_ID:
+            curr_value = int(hex_string, 16) - config.gen_ID_offset
+            curr_value = (curr_value ^ config.gen_layer_ID_offset) >> 8
+        else:
+            curr_value = int(hex_string, 16)
+        return curr_value
+
     # go to top in case we are not
     if validation_tree.parent:
         while validation_tree.parent:
@@ -233,17 +245,20 @@ def validate_staticUIDs(signals_dict: dict, validation_tree: VSSNode, config: ar
     # need current highest id new assignments during validation
     highest_id = 0
     for key, value in signals_dict.items():
-        current_value: int
-        if not config.gen_no_layer and not config.gen_decimal_ID:
-            current_value = int(value["staticUID"], 16) - config.gen_ID_offset
-            current_value = (current_value ^ config.gen_layer_ID_offset) >> 8
-        else:
-            current_value = int(value["staticUID"], 16)
-        if current_value > highest_id:
-            highest_id = current_value
+        current_id: int = get_id_from_string(
+            value['staticUID'], config
+        )
+        if current_id > highest_id:
+            highest_id = current_id
 
-    # tree_nodes = [node for node in PreOrderIter(tree)]
-    validation_tree_nodes = [node for node in PreOrderIter(validation_tree)]
+    validation_tree_nodes: list = []
+    for node in PreOrderIter(validation_tree):
+        validation_tree_nodes.append(node)
+        current_id_val: int = get_id_from_string(
+            node.extended_attributes['staticUID'], config
+        )
+        if current_id_val > highest_id:
+            highest_id = current_id_val
 
     # 1. check if all nodes have staticUID of correct length
     for key, value in signals_dict.items():
@@ -257,12 +272,13 @@ def validate_staticUIDs(signals_dict: dict, validation_tree: VSSNode, config: ar
         ][0]  # there could also be multiple matches?
 
         try:
-            assert (
-                value["staticUID"]
-                == validation_tree_nodes[match_tuple[1]].extended_attributes[
-                    "staticUID"
-                ]
-            )
+            # check static UID
+            validation_node = validation_tree_nodes[match_tuple[1]]
+            assert (value["staticUID"] == validation_node.extended_attributes["staticUID"])
+            # check type
+            # assert(value["type"] == validation_node.type.value)
+            # ToDo check unit
+
         except AssertionError:
             if config.validate_automatic_mode:
                 highest_id += 1
