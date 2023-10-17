@@ -139,7 +139,7 @@ def export(config: argparse.Namespace, signal_root: VSSNode, print_uuid):
         validation_tree = load_tree(
             other_path, ["."], tree_type=VSSTreeType.SIGNAL_TREE
         )
-        result_dict = validate_staticUIDs(signals_yaml_dict, validation_tree, config)
+        validate_staticUIDs(signals_yaml_dict, validation_tree, config)
 
     with open(config.output_file, "w") as f:
         yaml.dump(signals_yaml_dict, f)
@@ -178,7 +178,10 @@ def validate_staticUIDs(
                     )
             else:
                 try:
-                    assert len(value["staticUID"]) == 10 or len(value["staticUID"]) == 8
+                    if config.gen_no_layer:
+                        assert len(value["staticUID"]) == 8
+                    else:
+                        assert len(value["staticUID"]) == 10
                 except AssertionError:
                     logging.error(
                         f"AssertionError: Length of hex static UID of {key} is incorrect, check vssidgen.py"
@@ -190,7 +193,7 @@ def validate_staticUIDs(
     def assign_new_id(
         k: str, v: dict, assign_id: int, config: argparse.Namespace
     ) -> None:
-        """Assignment of next higher static UID if there is a mismatch of the current 
+        """Assignment of next higher static UID if there is a mismatch of the current
         file and the validation file
 
         Args:
@@ -199,7 +202,7 @@ def validate_staticUIDs(
             assign_id (int): the highest ID found in the original file
             config (argparse.Namespace): command line configuration from argparser
         """
-        assign_static_uid: int = 0
+        assign_static_uid: str
         if config.gen_decimal_ID:
             assign_static_uid = str(assign_id).zfill(6)
         else:
@@ -223,7 +226,7 @@ def validate_staticUIDs(
         """
         v["staticUID"] = current_id
         logging.info(f"Assigned new ID '{current_id}' for {k}")
-        
+
     # go to top in case we are not
     if validation_tree.parent:
         while validation_tree.parent:
@@ -248,13 +251,12 @@ def validate_staticUIDs(
     for key, value in signals_dict.items():
         check_length(key, value, decimal_output=config.gen_decimal_ID)
 
-        ## WIP: what if there was no match? we need optional method?
-
+        # ToDo: what if there was no match? we need optional method?
         match_tuple = [
             (key, id_validation_tree)
             for id_validation_tree, other_node in enumerate(validation_tree_nodes)
             if key == other_node.qualified_name()
-        ][0]
+        ][0]  # there could also be multiple matches?
 
         try:
             assert (
@@ -264,18 +266,18 @@ def validate_staticUIDs(
                 ]
             )
         except AssertionError:
-            logging.info(
-                f"IDs don't match what would you like to do? Current tree's node '{key}' "
-                f"has static UID '{value['staticUID']} and other "
-                f"tree's node '{validation_tree_nodes[match_tuple[1]].qualified_name()}' "
-                f"has static UID "
-                f"'{validation_tree_nodes[match_tuple[1]].extended_attributes['staticUID']}'\n1) Assign new ID\n2) Overwrite ID with new ID"
-            )
             if config.validate_automatic_mode:
-                raise NotImplementedError(
-                    "Automatic mode has not been implemented yet!"
-                )
+                highest_id += 1
+                assign_new_id(key, value, highest_id, config)
             else:
+                logging.info(
+                    f"IDs don't match what would you like to do? Current tree's node '{key}' "
+                    f"has static UID '{value['staticUID']} and other "
+                    f"tree's node '{validation_tree_nodes[match_tuple[1]].qualified_name()}' "
+                    f"has static UID "
+                    f"'{validation_tree_nodes[match_tuple[1]].extended_attributes['staticUID']}'\n"
+                    f"1) Assign new ID\n2) Overwrite ID with new ID"
+                )
                 while True:
                     try:
                         overwrite_method = OverwriteMethod(int(input()))
