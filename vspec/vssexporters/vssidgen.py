@@ -10,12 +10,12 @@
 #
 # Generate IDs of 4bytes size, 3 bytes incremental value + 1 byte for layer id.
 
-from anytree import PreOrderIter
+from anytree import PreOrderIter  # type: ignore
 import argparse
 from enum import Enum
 import logging
 import os
-from typing import Dict, Optional
+from typing import Dict
 from vspec import load_tree
 from vspec.model.constants import VSSTreeType
 from vspec.loggingconfig import initLogging
@@ -145,9 +145,7 @@ def export(config: argparse.Namespace, signal_root: VSSNode, print_uuid):
         yaml.dump(signals_yaml_dict, f)
 
 
-def validate_staticUIDs(
-    signals_dict: dict, validation_tree: VSSNode, config: argparse.Namespace
-) -> Optional[dict]:
+def validate_staticUIDs(signals_dict: dict, validation_tree: VSSNode, config: argparse.Namespace):
     """Check if static UIDs have changed or if new ones need to be added
     ToDos:
         - instances
@@ -159,7 +157,7 @@ def validate_staticUIDs(
         Optional[dict]: _description_
     """
 
-    def check_length(key, value, decimal_output) -> bool:
+    def check_length(key, value, decimal_output):
         """Check if static UID exists and if it's of correct length
 
         Args:
