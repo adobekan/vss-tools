@@ -6,6 +6,7 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
+
 def get_node_identifier_bytes(
     qualified_name: str,
     data_type: str,
@@ -28,14 +29,18 @@ def get_node_identifier_bytes(
     """
 
     return (
-        f"{qualified_name}: "
-        f"unit: {unit}, "
-        f"datatype: {data_type}, "
-        f"type: {node_type}"
-        f"allowed: {allowed}"
-        f"min: {minimum}"
-        f"max: {maximum}"
-    ).encode("utf-8").lower()
+        (
+            f"{qualified_name}: "
+            f"unit: {unit}, "
+            f"datatype: {data_type}, "
+            f"type: {node_type}"
+            f"allowed: {allowed}"
+            f"min: {minimum}"
+            f"max: {maximum}"
+        )
+        .encode("utf-8")
+        .lower()
+    )
 
 
 def fnv1_32_hash(identifier: bytes) -> int:

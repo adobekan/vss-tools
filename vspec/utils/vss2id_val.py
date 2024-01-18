@@ -6,18 +6,20 @@
 #
 # SPDX-License-Identifier: MPL-2.0
 
-from anytree import PreOrderIter  # type: ignore
 import argparse
 import logging
 import sys
-from typing import Optional
+from typing import List, Optional
+
+from anytree import PreOrderIter  # type: ignore
+
 from vspec.model.vsstree import VSSNode
 from vspec.utils.idgen_utils import fnv1_32_wrapper
 
 
 def validate_static_uids(
-    signals_dict: dict, validation_tree: VSSNode, config: argparse.Namespace
-):
+        signals_dict: dict, validation_tree: VSSNode, config: argparse.Namespace
+) -> List[VSSNode]:
     """Check if static UIDs have changed or if new ones need to be added
 
     @param signals_dict: to be exported dict of all signals containing static UID
@@ -55,22 +57,23 @@ def validate_static_uids(
                 old_static_uid = "0x" + fnv1_32_wrapper(fka_val, v)
                 for i, validation_node in enumerate(validation_tree_nodes):
                     if (
-                        old_static_uid
-                        == validation_node.extended_attributes["staticUID"]
+                            old_static_uid
+                            == validation_node.extended_attributes["staticUID"]
                     ):
                         logging.warning(
                             f"[Validation] SEMANTIC NAME CHANGE or PATH CHANGE for '{k}', "
                             f"it used to be '{validation_node.qualified_name()}'."
                         )
                         semantic_match = i
+
             return semantic_match
         else:
             return None
 
     def check_deprecation(k: str, v: dict, match_tuple: tuple):
         if (
-            "deprecation" in v.keys()
-            and validation_tree_nodes[match_tuple[1]].deprecation
+                "deprecation" in v.keys()
+                and validation_tree_nodes[match_tuple[1]].deprecation
         ):
             if v["deprecation"] != validation_tree_nodes[match_tuple[1]].deprecation:
                 logging.warning(
@@ -101,9 +104,9 @@ def validate_static_uids(
             matched_uids = [
                 (key, id_validation_tree)
                 for id_validation_tree, other_node in enumerate(validation_tree_nodes)
-                if value["staticUID"] == other_node.extended_attributes["staticUID"]
+                if value["staticUID"] == other_node.extended_attributes["staticUID"] and value[
+                    "deprecation"] == other_node.deprecation
             ]
-
             # if not matched via UID check semantics or path change
             if len(matched_uids) == 0:
                 semantic_match = check_semantics(key, value)
@@ -144,12 +147,30 @@ def validate_static_uids(
                 )
                 sys.exit(-1)
 
-        for node in validation_tree_nodes:
+        deleted_nodes: List[VSSNode] = [
+            node
+            for node in validation_tree_nodes
+            if node.extended_attributes["staticUID"]
+        ]
+        for node in deleted_nodes:
             logging.warning(
                 "[Validation] DELETED ATTRIBUTE: "
                 f"'{node.qualified_name()}' was not matched so it must have "
                 f"been deleted."
             )
+
+        added_nodes: List[VSSNode] = [
+            node
+            for node in validation_tree_nodes
+            if not node.extended_attributes["staticUID"]
+        ]
+        for node in added_nodes:
+            logging.warning(
+                "[Validation] NODE ADDED: "
+                f"{node.qualified_name()} was added in the static UID file"
+            )
+
+        return added_nodes
 
     if validation_tree.parent:
         while validation_tree.parent:
@@ -159,4 +180,6 @@ def validate_static_uids(
     for val_node in PreOrderIter(validation_tree):
         validation_tree_nodes.append(val_node)
 
-    hashed_pipeline()
+    remaining_nodes: List[VSSNode] = hashed_pipeline()
+
+    return remaining_nodes

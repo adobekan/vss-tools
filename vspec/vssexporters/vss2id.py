@@ -15,17 +15,16 @@ import logging
 import os
 import sys
 from typing import Dict, Tuple
+
+import yaml
+
 from vspec import load_tree
-from vspec.model.constants import VSSTreeType
 from vspec.loggingconfig import initLogging
+from vspec.model.constants import VSSTreeType
 from vspec.model.vsstree import VSSNode
 from vspec.utils import vss2id_val
-from vspec.utils.idgen_utils import (
-    get_node_identifier_bytes,
-    fnv1_32_hash,
-    get_all_keys_values,
-)
-import yaml
+from vspec.utils.idgen_utils import (fnv1_32_hash, get_all_keys_values,
+                                     get_node_identifier_bytes)
 
 
 def add_arguments(parser: argparse.ArgumentParser) -> None:
@@ -66,12 +65,13 @@ def generate_split_id(node: VSSNode, id_counter: int) -> Tuple[str, int]:
     return hashed_str, id_counter + 1
 
 
-def export_node(yaml_dict, node, id_counter) -> Tuple[int, int]:
+def export_node(yaml_dict, node, id_counter, recursive=True) -> Tuple[int, int]:
     """Recursive function to export the full tree to a dict
 
     @param yaml_dict: the to be exported dict
     @param node: parent node of the tree
     @param id_counter: counter for amount of ids
+    @param recursive: boolean if you want to run this function recursively
     @return: id_counter, id_counter
     """
     node_id, id_counter = generate_split_id(node, id_counter)
@@ -110,15 +110,15 @@ def export_node(yaml_dict, node, id_counter) -> Tuple[int, int]:
     elif "fka" in node.extended_attributes.keys():
         yaml_dict[node_path]["fka"] = node.extended_attributes["fka"]
 
-    if node.deprecation:
-        yaml_dict[node_path]["deprecation"] = node.deprecation
+    yaml_dict[node_path]["deprecation"] = node.deprecation if node.deprecation else ""
 
-    for child in node.children:
-        id_counter, id_counter = export_node(
-            yaml_dict,
-            child,
-            id_counter,
-        )
+    if recursive:
+        for child in node.children:
+            id_counter, id_counter = export_node(
+                yaml_dict,
+                child,
+                id_counter,
+            )
 
     return id_counter, id_counter
 
@@ -149,7 +149,11 @@ def export(config: argparse.Namespace, signal_root: VSSNode, print_uuid):
         validation_tree = load_tree(
             other_path, ["."], tree_type=VSSTreeType.SIGNAL_TREE
         )
-        vss2id_val.validate_static_uids(signals_yaml_dict, validation_tree, config)
+        new_nodes = vss2id_val.validate_static_uids(
+            signals_yaml_dict, validation_tree, config
+        )
+        for node in new_nodes:
+            id_counter, _ = export_node(signals_yaml_dict, node, id_counter)
 
     if not config.only_validate_no_export:
         with open(config.output_file, "w") as f:

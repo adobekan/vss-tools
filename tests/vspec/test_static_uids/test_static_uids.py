@@ -11,18 +11,18 @@
 #
 
 import os
-import pytest
 import shlex
-import vspec
-import vspec.vssexporters.vss2id as vss2id
-import vspec2x
+from typing import Dict
+
+import pytest
 import yaml
 
-from typing import Dict
-from vspec.model.constants import VSSTreeType, VSSDataType, VSSUnit
+import vspec
+import vspec2x
+import vspec.vssexporters.vss2id as vss2id
+from vspec.model.constants import VSSDataType, VSSTreeType, VSSUnit
 from vspec.model.vsstree import VSSNode
 from vspec.utils.idgen_utils import get_all_keys_values
-
 
 # HELPERS
 
