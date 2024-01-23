@@ -11,7 +11,7 @@ with a 4-byte identifier.
 usage: vspec2id.py [-h] [-I dir] [-e EXTENDED_ATTRIBUTES] [-s] [--abort-on-unknown-attribute] [--abort-on-name-style] [--format format] [--uuid] [--no-expand] [-o overlays] [-u unit_file]
                    [-q quantity_file] [-vt vspec_types_file] [-ot <types_output_file>] [--json-all-extended-attributes] [--json-pretty] [--yaml-all-extended-attributes] [-v version] [--all-idl-features]
                    [--gqlfield GQLFIELD GQLFIELD] [--jsonschema-all-extended-attributes] [--jsonschema-disallow-additional-properties] [--jsonschema-require-all-properties] [--jsonschema-pretty]
-                   [--validate-static-uid VALIDATE_STATIC_UID] [--only-validate-no-export] [--strict-mode]   
+                   [--validate-static-uid VALIDATE_STATIC_UID] [--only-validate-no-export] [--strict-mode]
                    <vspec_file> <output_file>
 
 Convert vspec to other formats.
