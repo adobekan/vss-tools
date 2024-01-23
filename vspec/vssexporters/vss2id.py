@@ -44,7 +44,7 @@ def add_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--strict-mode",
         action="store_true",
-        help="Strict mode means that the generation of static UIDs is case sensitive.",
+        help="Strict mode means that the generation of static UIDs is case-sensitive.",
     )
 
 
